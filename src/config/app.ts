@@ -11,6 +11,8 @@ export const appConfig = {
   tagline: 'Your account with Love Laundry',
   authKind: 'client' as 'staff' | 'client',
   /** /client/auth/login — the only sign-in this app may call. */
+  /** Hotel side of the business; sent at sign-in so a shared username cannot be confused with a shop login. */
+  clientType: 'HOTEL' as 'SHOP' | 'HOTEL',
   loginPath: '/client/auth/login',
   statusPath: '/client/auth/status',
   nav: [
