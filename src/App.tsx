@@ -6,6 +6,7 @@ import { RegisterPage } from './auth/RegisterPage'
 import { AppShell } from './shell/AppShell'
 import { OverviewPage } from './pages/OverviewPage'
 import { GatePassesPage } from './pages/GatePassesPage'
+import { LinensPage } from './pages/LinensPage'
 import { DeliveriesPage } from './pages/DeliveriesPage'
 import { InvoicesPage } from './pages/InvoicesPage'
 
@@ -33,6 +34,7 @@ function Router() {
       >
         <Route path="/" element={<OverviewPage />} />
         <Route path="/gate-passes" element={<GatePassesPage />} />
+        <Route path="/linens" element={<LinensPage />} />
         <Route path="/deliveries" element={<DeliveriesPage />} />
         <Route path="/invoices" element={<InvoicesPage />} />
       </Route>

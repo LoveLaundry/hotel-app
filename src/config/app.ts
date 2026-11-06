@@ -29,6 +29,12 @@ export const appConfig = {
       "blurb": "Every collection from your property, with piece counts."
     },
     {
+      "path": "/linens",
+      "label": "Linen tags",
+      "endpoint": "GET /client-portal/linens",
+      "blurb": "Your tagged linen, live status, and scan history per tag."
+    },
+    {
       "path": "/deliveries",
       "label": "Deliveries",
       "endpoint": "GET /client-portal/deliveries",
