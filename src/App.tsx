@@ -9,6 +9,7 @@ import { GatePassesPage } from './pages/GatePassesPage'
 import { LinensPage } from './pages/LinensPage'
 import { DeliveriesPage } from './pages/DeliveriesPage'
 import { InvoicesPage } from './pages/InvoicesPage'
+import { AboutPage } from './pages/AboutPage'
 
 function RequireAuth({ children }: { children: ReactNode }) {
   const { isAuthenticated } = useAuth()
@@ -25,6 +26,7 @@ function Router() {
         element={isAuthenticated ? <Navigate to="/" replace /> : <LoginPage />}
       />
       <Route path="/register" element={<RegisterPage />} />
+      <Route path="/about" element={<AboutPage />} />
       <Route
         element={
           <RequireAuth>

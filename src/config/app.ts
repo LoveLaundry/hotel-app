@@ -8,7 +8,7 @@ export interface NavItem {
 
 export const appConfig = {
   title: 'Hotel Desk',
-  tagline: 'Your account with Love Laundry',
+  tagline: 'Gate passes, linens, deliveries and invoices in one place',
   authKind: 'client' as 'staff' | 'client',
   /** /client/auth/login — the only sign-in this app may call. */
   /** Hotel side of the business; sent at sign-in so a shared username cannot be confused with a shop login. */
