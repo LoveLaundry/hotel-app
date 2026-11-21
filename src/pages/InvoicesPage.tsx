@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Eye, X } from 'lucide-react'
 import { dataApi, errorMessage } from '../api/client'
 import { formatDate, formatMoney, useQuery } from '../api/hooks'
 import { PageHeader, Panel, StateBox, StatusChip, Table } from '../ui/kit'
@@ -72,6 +73,7 @@ export function InvoicesPage() {
                   disabled={openingId === invoice.id}
                   className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold hover:bg-slate-50 disabled:opacity-60"
                 >
+                  <Eye size={13} aria-hidden="true" />
                   {openingId === invoice.id ? 'Opening…' : 'View'}
                 </button>
               </td>
@@ -130,6 +132,7 @@ export function InvoicesPage() {
               onClick={() => setDetail(null)}
               className="mt-5 rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium hover:bg-slate-50"
             >
+              <X size={14} aria-hidden="true" />
               Close
             </button>
           </Panel>
