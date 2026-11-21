@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Eye, X } from 'lucide-react'
 import { dataApi, errorMessage } from '../api/client'
 import { formatDate, formatMoney, useQuery } from '../api/hooks'
-import { PageHeader, Panel, StateBox, StatusChip, Table } from '../ui/kit'
+import { Notice, PageHeader, Pagination, Panel, StateBox, StatusChip, Table } from '../ui/kit'
 
 interface Invoice {
   id: string
@@ -22,6 +22,7 @@ interface Response {
 
 interface InvoiceDetail extends Invoice {
   items: Array<Record<string, unknown>>
+  total_amount?: number
   discounts: number
   transport_fee: number
   taxes: number
@@ -29,8 +30,17 @@ interface InvoiceDetail extends Invoice {
   notes: string | null
 }
 
+const PAGE_SIZE = 50
+const STATUSES = ['PENDING', 'ISSUED', 'PARTIALLY_PAID', 'PAID', 'CANCELLED']
+
 export function InvoicesPage() {
-  const { data, error, loading, reload } = useQuery<Response>('/client-portal/bills')
+  const [page, setPage] = useState(0)
+  const [paymentStatus, setPaymentStatus] = useState('')
+  const { data, error, loading, reload } = useQuery<Response>('/client-portal/bills', {
+    skip: page * PAGE_SIZE,
+    limit: PAGE_SIZE,
+    payment_status: paymentStatus || undefined,
+  })
   const [detail, setDetail] = useState<InvoiceDetail | null>(null)
   const [detailError, setDetailError] = useState<string | null>(null)
   const [openingId, setOpeningId] = useState<string | null>(null)
@@ -53,10 +63,37 @@ export function InvoicesPage() {
     <>
       <PageHeader title="Invoices" subtitle="What has been billed, what is settled" />
 
-      <StateBox loading={loading} error={error} empty={data?.items.length === 0} onRetry={reload}>
+      <div className="panel panel-pad mb-4">
+        <label className="block max-w-xs">
+          <span className="field-label">Filter by payment status</span>
+          <select
+            className="field-input select-input"
+            value={paymentStatus}
+            onChange={(event) => {
+              setPaymentStatus(event.target.value)
+              setPage(0)
+            }}
+            aria-label="Filter invoices by payment status"
+          >
+            <option value="">All statuses</option>
+            {STATUSES.map((value) => (
+              <option key={value} value={value}>{value.replaceAll('_', ' ')}</option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      <StateBox
+        loading={loading}
+        error={error}
+        empty={!loading && !error && (data?.items.length ?? 0) === 0}
+        onRetry={reload}
+        emptyTitle={paymentStatus ? 'No invoices with that status' : 'No invoices yet'}
+        emptyDetail={paymentStatus ? 'Choose a different status to see more records.' : 'Invoices raised by your provider will appear here.'}
+      >
         <Table head={['Invoice', 'Date', 'Total', 'Paid', 'Balance', 'Status', '']}>
           {(data?.items ?? []).map((invoice) => (
-            <tr key={invoice.id} className="hover:bg-slate-50">
+            <tr key={invoice.id}>
               <td className="px-4 py-3 font-medium">
                 {invoice.manual_bill_number || invoice.quotation_title || invoice.id.slice(-6)}
               </td>
@@ -64,79 +101,85 @@ export function InvoicesPage() {
               <td className="px-4 py-3 tabular-nums">{formatMoney(invoice.grand_total)}</td>
               <td className="px-4 py-3 tabular-nums text-slate-600">{formatMoney(invoice.paid_amount)}</td>
               <td className="px-4 py-3 tabular-nums font-semibold">{formatMoney(invoice.balance)}</td>
-              <td className="px-4 py-3">
-                <StatusChip status={invoice.payment_status} />
-              </td>
+              <td className="px-4 py-3"><StatusChip status={invoice.payment_status} /></td>
               <td className="px-4 py-3 text-right">
                 <button
+                  type="button"
                   onClick={() => void open(invoice)}
                   disabled={openingId === invoice.id}
-                  className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold hover:bg-slate-50 disabled:opacity-60"
+                  className="btn btn-secondary"
+                  aria-label={`View invoice ${invoice.manual_bill_number || invoice.id.slice(-6)}`}
                 >
-                  <Eye size={13} aria-hidden="true" />
+                  <Eye />
                   {openingId === invoice.id ? 'Opening…' : 'View'}
                 </button>
               </td>
             </tr>
           ))}
         </Table>
+        <Pagination
+          page={page}
+          pageSize={PAGE_SIZE}
+          total={data?.total ?? 0}
+          onPage={setPage}
+          label="invoices"
+        />
       </StateBox>
 
       {detailError ? (
         <div className="mt-4">
-          <Panel>
-            <p className="text-sm text-red-700">{detailError}</p>
-          </Panel>
+          <Notice tone="danger" title="Invoice detail could not be loaded">
+            {detailError}
+          </Notice>
         </div>
       ) : null}
 
       {detail ? (
-        <div className="mt-6">
-          <Panel>
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Invoice detail
-                </p>
-                <h2 className="mt-1 text-lg font-semibold">
-                  {detail.manual_bill_number || detail.quotation_title || detail.id}
-                </h2>
-                <p className="text-sm text-slate-500">{formatDate(detail.created_at)}</p>
-              </div>
-              <div className="text-right">
-                <StatusChip status={detail.payment_status} />
-                <p className="mt-2 text-lg font-semibold tabular-nums">
-                  {formatMoney(detail.balance)} due
-                </p>
-              </div>
-            </div>
-
-            <dl className="mt-5 grid gap-x-8 gap-y-2 text-sm sm:grid-cols-2">
-              <Row label="Subtotal" value={formatMoney(detail.grand_total - detail.discounts - detail.transport_fee - detail.taxes - detail.additional_charges)} />
-              <Row label="Discounts" value={formatMoney(-detail.discounts)} />
-              <Row label="Transport" value={formatMoney(detail.transport_fee)} />
-              <Row label="Taxes" value={formatMoney(detail.taxes)} />
-              <Row label="Additional charges" value={formatMoney(detail.additional_charges)} />
-              <Row label="Grand total" value={formatMoney(detail.grand_total)} strong />
-              <Row label="Paid" value={formatMoney(detail.paid_amount)} />
-              <Row label="Balance" value={formatMoney(detail.balance)} strong />
-            </dl>
-
-            {detail.notes ? (
-              <p className="mt-4 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-600">
-                {detail.notes}
+        <Panel className="mt-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Invoice detail
               </p>
-            ) : null}
+              <h2 className="mt-1 text-lg font-semibold">
+                {detail.manual_bill_number || detail.quotation_title || detail.id}
+              </h2>
+              <p className="text-sm text-slate-500">{formatDate(detail.created_at)}</p>
+            </div>
+            <div className="text-right">
+              <StatusChip status={detail.payment_status} />
+              <p className="mt-2 text-lg font-semibold tabular-nums">
+                {formatMoney(detail.balance)} due
+              </p>
+            </div>
+          </div>
 
-            <button
-              onClick={() => setDetail(null)}
-              className="mt-5 rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium hover:bg-slate-50"
-            >
-              <X size={14} aria-hidden="true" />
-              Close
-            </button>
-          </Panel>
-        </div>
+          <dl className="mt-5 grid gap-x-8 gap-y-2 text-sm sm:grid-cols-2">
+            <Row label="Subtotal" value={formatMoney(detail.total_amount ?? detail.grand_total)} />
+            <Row label="Discounts" value={formatMoney(-detail.discounts)} />
+            <Row label="Transport" value={formatMoney(detail.transport_fee)} />
+            <Row label="Taxes" value={formatMoney(detail.taxes)} />
+            <Row label="Additional charges" value={formatMoney(detail.additional_charges)} />
+            <Row label="Grand total" value={formatMoney(detail.grand_total)} strong />
+            <Row label="Paid" value={formatMoney(detail.paid_amount)} />
+            <Row label="Balance" value={formatMoney(detail.balance)} strong />
+          </dl>
+
+          {detail.notes ? (
+            <p className="mt-4 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-600">
+              {detail.notes}
+            </p>
+          ) : null}
+
+          <button
+            type="button"
+            onClick={() => setDetail(null)}
+            className="btn btn-secondary mt-5"
+          >
+            <X />
+            Close
+          </button>
+        </Panel>
       ) : null}
     </>
   )
