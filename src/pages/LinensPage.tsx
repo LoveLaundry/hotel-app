@@ -82,7 +82,10 @@ export function LinensPage() {
   const [selected, setSelected] = useState<string | null>(null)
   const [filter, setFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
-  const { data, error, status, loading, reload } = useQuery<Response>('/client-portal/linens')
+  // The endpoint caps at 500 tags per request. Ask for that cap explicitly so
+  // the count line below can tell the operator when a larger inventory is
+  // truncated instead of silently showing a partial list.
+  const { data, error, status, loading, reload } = useQuery<Response>('/client-portal/linens', { limit: 500 })
 
   const rows = useMemo(() => {
     const needle = filter.trim().toLowerCase()
@@ -191,12 +194,13 @@ export function LinensPage() {
             </Table>
             {data ? (
               <p className="mt-3 text-xs text-slate-500">
-                Showing {rows.length} of {data.total} tags.
+                Showing {rows.length} of {data.total} tags
+                {data.total > 500 ? ' (first 500 loaded)' : ''}.
               </p>
             ) : null}
           </StateBox>
 
-          {selected ? <ScanHistory code={selected} onClose={() => setSelected(null)} /> : null}
+          {selected ? <ScanHistory key={selected} code={selected} onClose={() => setSelected(null)} /> : null}
         </>
       )}
     </>
