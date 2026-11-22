@@ -64,7 +64,7 @@ export function RegisterPage() {
                   Laundry, shop, and hotel administrator accounts are created directly by the platform
                   administrator.
                 </p>
-                <p style={{ margin: '0.5rem 0 0', fontSize: '0.72rem', opacity: 0.85 }}>
+                <p style={{ margin: '0.5rem 0 0', fontSize: '0.8125rem', opacity: 0.85 }}>
                   If you require access or staff credentials, please contact your laundry platform
                   administrator.
                 </p>
@@ -133,7 +133,7 @@ export function RegisterPage() {
                 <button type="submit" disabled={!canCheck} className="btn btn-secondary btn-block">
                   Check password guidance
                 </button>
-                <p className="fp-muted" style={{ margin: 0, fontSize: '0.7rem' }}>
+                <p className="fp-muted" style={{ margin: 0, fontSize: '0.8125rem' }}>
                   Guidance only — accounts are issued by your administrator.
                 </p>
               </form>

@@ -622,3 +622,249 @@ kbd {
   .fp-toasts { bottom: 1rem; }
   .fp-back-to-top { bottom: 4.6rem; }
 }
+
+/* ── Responsive + readability hardening (load order: after index.css) ───────
+   Last layer for small screens. Rules here keep every *visible* text node at
+   least 12px / 0.75rem (body copy and labels 13px, titles >= 14px), give text
+   containers room to wrap instead of collapsing, and make every overlay fit a
+   375px viewport. sr-only text and brand/token values are deliberately left
+   alone, and the 720px table-to-card fallback above stays intact.
+   ------------------------------------------------------------------------- */
+
+/* A type floor for unclassed text nodes: never shrink below 12px, and never
+   shrink below the size their parent already uses. Class rules below provide
+   the preferred 13px body/label size. */
+:is(p, span, strong, em, small, code, kbd, dt, dd, li, td, th, button, label,
+  summary, input, select, textarea, a) {
+  font-size: max(0.75rem, 1em);
+}
+
+/* Shell text that was previously below the readability floor. */
+.topbar-subtitle,
+.panel-note { font-size: 0.8125rem; }
+.sidebar-section,
+.user-role,
+.stat-label,
+.chip,
+.visual-kicker,
+.auth-kicker,
+.about-mark,
+.about-role,
+.about-meta dt,
+.data-table th { font-size: 0.75rem; }
+
+/* Feature-pack text previously sized between 9px and 11.9px. */
+.fp-scope-badge,
+.fp-draft-banner,
+.fp-error-summary,
+.fp-collapsible summary,
+.fp-collapsible-body,
+.fp-toggle,
+.fp-notification-list span,
+.fp-palette-empty,
+.fp-toast,
+.fp-bulk-bar,
+.fp-table-state,
+.fp-card dl > div,
+.fp-table-footer,
+.fp-detail-row,
+.fp-detail-list li,
+.fp-detail-note,
+.fp-guide-intro p,
+.fp-guide-detail p,
+.fp-guide-empty,
+.fp-boundary p { font-size: 0.8125rem; }
+
+.fp-scope-type,
+.fp-last-signin,
+.fp-freshness,
+.fp-field-error,
+.fp-counter,
+.fp-autosave,
+.fp-step,
+.fp-step > span,
+.fp-strength-label,
+kbd,
+.fp-notification-list small,
+.fp-palette-results button small,
+.fp-bell .fp-badge,
+.fp-compact-field,
+.fp-date-range input,
+.fp-menu-title,
+.fp-segmented button,
+.fp-bulk-bar .btn,
+.fp-detail-grid span,
+.fp-guide-result-count,
+.fp-filter,
+.fp-guide-id,
+.fp-guide-area,
+.fp-guide-detail code { font-size: 0.75rem; }
+
+.fp-guide-actions .btn { font-size: 0.8125rem; }
+.fp-step > span { width: 20px; height: 20px; flex: 0 0 auto; }
+.fp-scope-type { letter-spacing: 0.04em; white-space: nowrap; }
+.user-role { letter-spacing: 0.04em; }
+
+/* Text-bearing flex children need permission to shrink and to wrap. Ellipsis
+   stays only on .fp-truncate, whose component exposes the full value via title. */
+:is(.topbar-title, .topbar-actions, .topbar-actions > *, .fp-scope-badge,
+  .select-wrap, .scope-select, .app-user, .user-meta, .user-name, .user-role,
+  .fp-toolbar-left, .fp-toolbar-right, .fp-search, .fp-compact-field,
+  .fp-date-range, .fp-menu, .fp-bulk-bar, .fp-bulk-bar > *, .fp-card-select,
+  .fp-guide-filters, .fp-guide-row, .fp-guide-row > *, .fp-guide-detail,
+  .fp-detail-grid > div, .fp-notification-list button, .fp-palette-results button,
+  .fp-toast > span, .fp-dialog-actions > *, .fp-table-footer, .notice > div,
+  .page-header > div, .app-footer-inner > *) { min-width: 0; }
+
+:is(.topbar-title h1, .topbar-subtitle, .sidebar-title, .user-name, .user-role,
+  .fp-scope-badge, .fp-guide-title, .fp-guide-area, .fp-guide-detail code,
+  .fp-card dd, .fp-detail-grid strong, .fp-detail-row, .fp-detail-list li,
+  .data-table td, .fp-toast > span, .fp-palette-results button span,
+  .notice p, .fp-dialog p, .fp-table-state p, .app-footer-inner span,
+  .fp-bulk-bar span) {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+/* Headings wrap; they have no title attribute to reveal a clipped label. */
+.topbar-title h1,
+.topbar-subtitle,
+.sidebar-title {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+}
+.topbar-title h1 { font-size: 1.15rem; }
+
+/* Long IDs, client names and file paths must never force a scroller wider
+   than the viewport. */
+.fp-guide-detail code { display: block; max-width: 100%; }
+.fp-truncate { display: block; max-width: 100%; }
+.data-table-wrap,
+.fp-table-viewport,
+.fp-drawer-body,
+.fp-guide-scroll,
+.fp-palette-results { max-width: 100%; }
+
+.mobile-nav {
+  width: 100%;
+  max-width: 100vw;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+}
+.mobile-nav-link { font-size: 0.8125rem; }
+
+/* Overlay geometry is viewport-relative with internal scrolling, so dialogs,
+   drawers, toasts and preference panels cannot clip content on a short screen. */
+.fp-dialog,
+.fp-guide-dialog,
+.fp-palette,
+.fp-drawer,
+.fp-toasts { max-width: calc(100vw - 1rem); }
+.fp-dialog,
+.fp-drawer,
+.fp-guide-scroll,
+.fp-palette-results { overscroll-behavior: contain; }
+.fp-drawer-body { min-height: 0; }
+
+@media (max-width: 640px) {
+  .topbar-main {
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 0.5rem 0.65rem;
+  }
+  .topbar-title { flex: 1 1 100%; }
+  .topbar-actions {
+    flex: 1 1 100%;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    gap: 0.4rem;
+  }
+  .scope-select { width: min(100%, 12rem); }
+  .select-wrap { max-width: 100%; }
+  .fp-scope-badge {
+    max-width: min(100%, 13rem);
+    white-space: normal;
+  }
+  .app-user { max-width: 100%; }
+
+  .fp-overlay { padding: 0.5rem; }
+  .fp-dialog,
+  .fp-guide-dialog,
+  .fp-palette {
+    width: 100%;
+    max-width: 100%;
+    max-height: calc(100dvh - 1rem);
+  }
+  .fp-dialog { padding: 0.85rem; }
+  .fp-dialog-wide > p,
+  .fp-dialog-wide > dl,
+  .fp-dialog-wide > .fp-dialog-actions,
+  .fp-dialog-wide > .fp-collapsible { margin-inline: 0.85rem; }
+  .fp-dialog-actions .btn { flex: 1 1 auto; }
+  .fp-drawer { width: 100%; max-width: 100%; max-height: 100%; }
+  .fp-drawer-head { gap: 0.5rem; padding: 0.65rem 0.75rem; }
+  .fp-drawer-body { padding: 0.75rem; }
+  .fp-drawer-actions { flex-wrap: wrap; }
+  .fp-guide-dialog { display: flex; flex-direction: column; overflow: hidden; }
+  .fp-guide-scroll { flex: 1 1 auto; min-height: 0; max-height: none; padding: 0.75rem; }
+  .fp-palette { display: flex; flex-direction: column; margin-top: 0; }
+  .fp-palette-results { flex: 1 1 auto; min-height: 0; max-height: none; }
+  .fp-toasts { left: 0.5rem; right: 0.5rem; bottom: 0.5rem; width: auto; }
+
+  .fp-detail-grid { grid-template-columns: minmax(0, 1fr); }
+  .fp-guide-filters,
+  .fp-guide-actions,
+  .fp-table-toolbar,
+  .fp-toolbar-left,
+  .fp-toolbar-right { flex-direction: column; align-items: stretch; }
+  .fp-search { min-width: 0; width: 100%; }
+  .fp-date-range { flex-wrap: wrap; }
+  .fp-date-range input { flex: 1 1 7rem; min-width: 0; }
+  .fp-menu-body { position: static; width: 100%; max-height: 50dvh; overflow-y: auto; }
+  .fp-card dl > div { flex-wrap: wrap; gap: 0.2rem 0.6rem; }
+  .fp-card dd { text-align: left; }
+  .fp-shortcut-list > div { flex-wrap: wrap; gap: 0.2rem 0.6rem; }
+  .fp-shortcut-list dd { text-align: left; }
+  .fp-notification-list button { padding-inline: 0.75rem; }
+  .fp-table-footer { flex-wrap: wrap; gap: 0.5rem; }
+
+  /* The about banner had a fixed aspect ratio that clipped its copy at 375px. */
+  .about-banner { aspect-ratio: auto; min-height: 9rem; }
+}
+
+@media (max-width: 375px) {
+  .topbar-main,
+  .app-main,
+  .app-footer-inner,
+  .mobile-nav { padding-inline: 0.6rem; }
+  .topbar-actions { gap: 0.35rem; }
+  .fp-scope-badge { max-width: 100%; gap: 0.25rem; padding-inline: 0.45rem; }
+  .select-wrap,
+  .scope-select { width: 100%; max-width: 100%; }
+  .fp-overlay { padding: 0.35rem; }
+  .fp-dialog,
+  .fp-guide-dialog,
+  .fp-palette,
+  .fp-drawer { max-width: calc(100vw - 0.7rem); max-height: calc(100dvh - 0.7rem); }
+  .fp-dialog { padding: 0.7rem; }
+  .fp-guide-scroll { padding: 0.6rem; }
+  .fp-guide-row { gap: 0.35rem; padding: 0.45rem; }
+  .fp-guide-id { width: 1.4rem; }
+  .fp-guide-area { padding-inline: 0.3rem; }
+  .fp-guide-detail { padding-left: 0.75rem; }
+  .fp-card { padding: 0.65rem; }
+  .fp-detail-grid > div { padding: 0.45rem 0.5rem; }
+  .fp-toasts { left: 0.35rem; right: 0.35rem; bottom: 0.35rem; }
+  .app-footer-inner { gap: 0.4rem; }
+}
+
+/* Comfortable touch targets at phone widths, independent of pointer type. */
+@media (max-width: 767px) {
+  :root body :where(button, a, [role='button']):not(.sr-only):not(.sr-only *) {
+    min-height: 40px;
+  }
+  :root body :where(button, [role='button']):not(.sr-only):not(.sr-only *) {
+    min-width: 40px;
+  }
+}
