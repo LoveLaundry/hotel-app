@@ -11,6 +11,15 @@ import {
   type SessionUser,
 } from '../session'
 import { loadAssociations, switchLaundry as switchLaundryRequest, type Association } from './associations'
+import {
+  assertHotelClientType,
+  assertHotelRole,
+  clearFeatureCache,
+  normalizeAssociation,
+  rememberLaundry,
+  STORAGE_KEYS,
+  writeJson,
+} from '../features/feature-pack/utils'
 
 interface SignInInput {
   username: string
@@ -55,7 +64,8 @@ function staffUser(user: Record<string, unknown>): SessionUser {
 function clientUser(client: Record<string, unknown>): SessionUser {
   return {
     name: String(client.user_name ?? client.auth_id ?? 'Client'),
-    role: String(client.role_id ?? '').toUpperCase(),
+    // Only HOTEL_ADMIN / HOTEL_MANAGER may identify as a hotel account.
+    role: assertHotelRole(client.role_id ?? client.role),
     laundry: client.laundry_id ? String(client.laundry_id) : undefined,
     clientName: client.client_name ? String(client.client_name) : undefined,
   }
@@ -70,16 +80,9 @@ function laundryChoicesFrom(error: unknown): Association[] | null {
   const payload = detail as { code?: string; laundries?: unknown }
   if (payload.code !== 'laundry_required' || !Array.isArray(payload.laundries)) return null
   // The multi-laundry 409 only identifies the candidates. It does not carry
-  // their membership status or role, so fill in the fields the choice screen
-  // needs instead of handing it objects whose `status` is undefined.
-  return (payload.laundries as Record<string, unknown>[]).map((raw) => ({
-    laundry_id: String(raw.laundry_id ?? ''),
-    laundry_name: String(raw.laundry_name ?? raw.laundry_id ?? ''),
-    client_name: String(raw.client_name ?? ''),
-    client_type: String(raw.client_type ?? ''),
-    role_id: String(raw.role_id ?? ''),
-    status: String(raw.status ?? 'ACTIVE'),
-  }))
+  // their membership status or role, so normalise to ACTIVE / HOTEL defaults
+  // for display only. The server still decides whether a choice may sign in.
+  return (payload.laundries as Record<string, unknown>[]).map(normalizeAssociation)
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -95,11 +98,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = useCallback(() => {
     clearSession()
+    clearFeatureCache()
     setSession(null)
     setLaundries([])
+    window.dispatchEvent(new CustomEvent('ll_hotel:session', { detail: { token: undefined } }))
   }, [])
 
+  // The global "exit safely" action owns navigation; auth only clears state.
+  useEffect(() => {
+    window.addEventListener('ll_hotel:force-signout', signOut)
+    return () => window.removeEventListener('ll_hotel:force-signout', signOut)
+  }, [signOut])
+
   const signIn = useCallback(async ({ username, password, laundryId }: SignInInput) => {
+    assertHotelClientType(appConfig.clientType)
     const isClient = appConfig.authKind === 'client'
     const body = isClient
       ? {
@@ -136,12 +148,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const next: Session = { token: String(data.access_token), user }
     writeSession(next)
     setSession(next)
+    rememberLaundry(user.laundry)
+    writeJson(STORAGE_KEYS.lastSignIn, { at: new Date().toISOString(), name: user.name })
+    window.dispatchEvent(new CustomEvent('ll_hotel:session', { detail: { token: next.token } }))
+    window.dispatchEvent(
+      new CustomEvent('ll_hotel:notification', {
+        detail: { title: 'Signed in', body: `Hotel account for ${user.clientName ?? user.laundry ?? 'your property'}.` },
+      }),
+    )
   }, [])
 
   const switchLaundry = useCallback(async (laundryId: string) => {
     const next = await switchLaundryRequest(laundryId)
+    clearFeatureCache()
     writeSession(next)
     setSession(next)
+    rememberLaundry(next.user.laundry)
+    window.dispatchEvent(new CustomEvent('ll_hotel:session', { detail: { token: next.token } }))
   }, [])
 
   // Which laundries this login can reach. Only clients can be associated with

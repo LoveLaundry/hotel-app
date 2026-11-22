@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { clearSession, getToken } from '../session'
+import { createIdempotencyKey, isSafePortalPath, normalizeError } from '../features/feature-pack/utils'
 
 /** Sign-in, session status, and hotel client auth. */
 export const authApi = axios.create({
@@ -20,7 +21,16 @@ export const dataApi = axios.create({
 for (const instance of [authApi, dataApi]) {
   instance.interceptors.request.use((config) => {
     const token = getToken()
-    if (token) config.headers.Authorization = `Bearer ${token}`
+    // A hotel token is only ever attached to this portal's own endpoints.
+    // Laundry-app routes and /today must never receive it, even by accident.
+    if (token && isSafePortalPath(config.url ?? '')) {
+      config.headers.Authorization = `Bearer ${token}`
+    } else {
+      delete config.headers.Authorization
+    }
+    // Hotel writes are idempotent by design: a retry after a timeout must not
+    // create a second association switch or duplicate any portal-side action.
+    if (config.method === 'post') config.headers['X-Idempotency-Key'] = createIdempotencyKey()
     return config
   })
 
@@ -33,6 +43,7 @@ for (const instance of [authApi, dataApi]) {
       // for opening a page they were never allowed to see.
       if (status === 401) {
         clearSession()
+        window.dispatchEvent(new Event('ll_hotel:unauthorized'))
         if (!window.location.pathname.startsWith('/login')) {
           window.location.assign('/login')
         }
@@ -48,12 +59,5 @@ export function errorStatus(error: unknown): number | undefined {
 }
 
 export function errorMessage(error: unknown): string {
-  if (axios.isAxiosError(error)) {
-    const detail = (error.response?.data as { detail?: unknown } | undefined)?.detail
-    if (typeof detail === 'string' && detail.trim()) return detail
-    if (error.response?.status === 404) return 'The requested information is not available yet.'
-    if (error.code === 'ECONNABORTED') return 'The server took too long to respond. Try again.'
-    if (!error.response) return 'Cannot reach the server. Check your connection.'
-  }
-  return 'Something went wrong. Try again.'
+  return normalizeError(error)
 }

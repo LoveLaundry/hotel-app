@@ -1,7 +1,12 @@
-import { useMemo, useState } from 'react'
-import { ChevronDown, ChevronRight, X } from 'lucide-react'
 import { formatDate, useQuery } from '../api/hooks'
-import { Notice, PageHeader, Panel, StateBox, StatusChip, Table } from '../ui/kit'
+import { formatNumber } from '../features/feature-pack/utils'
+import {
+  DataFreshness,
+  FeatureTable,
+  RefreshButton,
+  TruncatedText,
+} from '../features/feature-pack/components'
+import { Notice, PageHeader, StatusChip } from '../ui/kit'
 
 interface Linen {
   id: string
@@ -29,83 +34,46 @@ interface ScanEvent {
   timestamp?: string | null
 }
 
-function ScanHistory({ code, onClose }: { code: string; onClose: () => void }) {
+function ScanHistory({ code }: { code: string }) {
   const { data, error, status, loading, reload } = useQuery<{ linen_id: string; events: ScanEvent[] }>(
     `/client-portal/linens/${code}/events`,
   )
-
+  if (loading) return <p className="text-sm text-slate-500">Loading scan history…</p>
+  if (status === 404) {
+    return (
+      <p className="text-sm text-slate-500">
+        Scan history is not available for this tag yet. It will appear once the first movement is recorded.
+      </p>
+    )
+  }
+  if (error) {
+    return (
+      <Notice tone="danger" title="History could not be loaded" action={<button type="button" className="btn btn-secondary" onClick={reload}>Try again</button>}>
+        {error}
+      </Notice>
+    )
+  }
+  const events = data?.events ?? []
+  if (events.length === 0) return <p className="text-sm text-slate-500">No scans recorded for this tag yet.</p>
   return (
-    <Panel className="mt-4">
-      <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
-        <div>
-          <p className="panel-title">Scan history</p>
-          <p className="panel-note">Tag {code} · newest movement first</p>
-        </div>
-        <button type="button" onClick={onClose} className="btn btn-secondary" aria-label="Close scan history">
-          <X />
-          Close
-        </button>
-      </div>
-
-      {loading ? <p className="text-sm text-slate-500">Loading…</p> : null}
-      {status === 404 ? (
-        <p className="text-sm text-slate-500">
-          Scan history is not available for this tag yet. It will appear once the first movement is recorded.
-        </p>
-      ) : error && status !== 404 ? (
-        <Notice tone="danger" title="History could not be loaded" action={<button type="button" className="btn btn-secondary" onClick={reload}>Try again</button>}>
-          {error}
-        </Notice>
-      ) : null}
-      {data && data.events.length === 0 && !loading ? (
-        <p className="text-sm text-slate-500">No scans recorded for this tag yet.</p>
-      ) : null}
-      {data && data.events.length > 0 ? (
-        <ul className="divide-y divide-slate-100">
-          {data.events.map((evt, i) => (
-            <li key={`${evt.timestamp ?? 'event'}-${i}`} className="flex flex-wrap items-center justify-between gap-3 py-2 text-sm">
-              <span className="font-medium">{evt.action}</span>
-              <span className="text-slate-500">
-                {evt.from_status} → {evt.to_status}
-                {evt.user ? ` · ${evt.user}` : ''}
-              </span>
-              <span className="text-slate-400">{evt.timestamp ? formatDate(evt.timestamp) : ''}</span>
-            </li>
-          ))}
-        </ul>
-      ) : null}
-    </Panel>
+    <ul className="divide-y divide-slate-100">
+      {events.map((evt, index) => (
+        <li key={`${evt.timestamp ?? 'event'}-${index}`} className="flex flex-wrap items-center justify-between gap-3 py-2 text-sm">
+          <span className="font-medium">{evt.action}</span>
+          <span className="text-slate-500">
+            {evt.from_status} → {evt.to_status}
+            {evt.user ? ` · ${evt.user}` : ''}
+          </span>
+          <span className="text-slate-400">{evt.timestamp ? formatDate(evt.timestamp) : ''}</span>
+        </li>
+      ))}
+    </ul>
   )
 }
 
 export function LinensPage() {
-  const [selected, setSelected] = useState<string | null>(null)
-  const [filter, setFilter] = useState('')
-  const [statusFilter, setStatusFilter] = useState('')
-  // The endpoint caps at 500 tags per request. Ask for that cap explicitly so
-  // the count line below can tell the operator when a larger inventory is
-  // truncated instead of silently showing a partial list.
-  const { data, error, status, loading, reload } = useQuery<Response>('/client-portal/linens', { limit: 500 })
-
-  const rows = useMemo(() => {
-    const needle = filter.trim().toLowerCase()
-    return (data?.items ?? []).filter((linen) => {
-      if (statusFilter && (linen.status ?? '').toUpperCase() !== statusFilter) return false
-      if (!needle) return true
-      return [linen.linen_id, linen.item_type, linen.description, linen.category]
-        .filter(Boolean)
-        .some((value) => String(value).toLowerCase().includes(needle))
-    })
-  }, [data, filter, statusFilter])
-
-  const statuses = useMemo(
-    () => [...new Set((data?.items ?? []).map((linen) => linen.status).filter(Boolean))].sort(),
-    [data],
-  )
-
-  function toggle(code: string) {
-    setSelected((current) => (current === code ? null : code))
-  }
+  const { data, error, status, loading, updating, lastUpdated, truncated, reload } = useQuery<Response>('/client-portal/linens', { limit: 500 })
+  const rows = data?.items ?? []
 
   return (
     <>
@@ -113,6 +81,11 @@ export function LinensPage() {
         title="Linen tags"
         subtitle="Your tagged linen with live status — select a tag to see every movement"
       />
+
+      <div className="fp-table-toolbar" style={{ marginBottom: '0.9rem' }}>
+        <DataFreshness at={lastUpdated} loading={updating} />
+        <RefreshButton onRefresh={reload} label="Refresh linen tags" />
+      </div>
 
       {status === 404 ? (
         <Notice
@@ -124,83 +97,80 @@ export function LinensPage() {
         </Notice>
       ) : (
         <>
-          <div className="panel panel-pad mb-4">
-            <div className="flex flex-wrap items-end gap-3">
-              <label className="min-w-[14rem] flex-1">
-                <span className="field-label">Search tags</span>
-                <input
-                  className="field-input"
-                  value={filter}
-                  onChange={(event) => setFilter(event.target.value)}
-                  placeholder="Tag number, item or category"
-                  aria-label="Search linen tags"
-                />
-              </label>
-              <label className="min-w-[11rem]">
-                <span className="field-label">Status</span>
-                <select
-                  className="field-input select-input"
-                  value={statusFilter}
-                  onChange={(event) => setStatusFilter(event.target.value)}
-                  aria-label="Filter linen tags by status"
-                >
-                  <option value="">All statuses</option>
-                  {statuses.map((value) => (
-                    <option key={String(value)} value={String(value).toUpperCase()}>
-                      {String(value).replaceAll('_', ' ')}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-          </div>
+          {truncated ? (
+            <p className="fp-inline-warning" role="status">
+              Showing the first 500 tags. Search or filter to find a specific tag.
+            </p>
+          ) : null}
 
-          <StateBox
+          <FeatureTable
+            namespace="linens"
+            caption="Linen tags"
+            rows={rows}
             loading={loading}
             error={error}
-            empty={!loading && !error && rows.length === 0}
             onRetry={reload}
-            emptyTitle={data?.items.length ? 'No tags match those filters' : 'No linen tags yet'}
-            emptyDetail={data?.items.length ? 'Clear the search or status filter to see all tags.' : 'Tags issued to your property will appear here.'}
-          >
-            <Table head={['Tag', 'Item', 'Status', 'Condition', 'Washes', 'Last scan']}>
-              {rows.map((linen) => {
-                const isOpen = selected === linen.linen_id
-                return (
-                  <tr key={linen.id} className={isOpen ? 'is-selected' : ''}>
-                    <td className="px-4 py-3 font-mono font-medium">
-                      <button
-                        type="button"
-                        className="link-button"
-                        aria-expanded={isOpen}
-                        onClick={() => toggle(linen.linen_id)}
-                      >
-                        {isOpen ? <ChevronDown size={14} aria-hidden="true" /> : <ChevronRight size={14} aria-hidden="true" />}
-                        {linen.linen_id}
-                      </button>
-                    </td>
-                    <td className="px-4 py-3 text-slate-600">
-                      {[linen.item_type, linen.description].filter(Boolean).join(' — ') || linen.category || '—'}
-                    </td>
-                    <td className="px-4 py-3"><StatusChip status={linen.status ?? ''} /></td>
-                    <td className="px-4 py-3 text-slate-600">{linen.condition || '—'}</td>
-                    <td className="px-4 py-3 tabular-nums">{linen.wash_count ?? 0}</td>
-                    <td className="px-4 py-3 text-slate-600">
-                      {linen.last_scanned_date ? formatDate(linen.last_scanned_date) : '—'}
-                    </td>
-                  </tr>
-                )
-              })}
-            </Table>
-            {data ? (
-              <p className="mt-3 text-xs text-slate-500">
-                Showing {rows.length} of {data.total} tags
-                {data.total > 500 ? ' (first 500 loaded)' : ''}.
-              </p>
-            ) : null}
-          </StateBox>
+            onRefresh={reload}
+            getRowId={(row) => row.id}
+            getStatus={(row) => row.status}
+            getDate={(row) => row.last_scanned_date ?? row.updated_at}
+            searchText={(row) => [row.linen_id, row.item_type, row.description, row.category, row.condition]}
+            detailTitle={(row) => `Tag ${row.linen_id}`}
+            renderDetail={(row) => <ScanHistory code={row.linen_id} />}
+            columns={[
+              {
+                key: 'tag',
+                label: 'Tag',
+                cardLabel: true,
+                render: (row) => <span className="font-mono font-medium">{row.linen_id}</span>,
+                exportValue: (row) => row.linen_id,
+                sortValue: (row) => row.linen_id,
+              },
+              {
+                key: 'item',
+                label: 'Item',
+                render: (row) => <TruncatedText value={[row.item_type, row.description].filter(Boolean).join(' — ') || row.category || '—'} max={34} />,
+                exportValue: (row) => [row.item_type, row.description].filter(Boolean).join(' — ') || row.category,
+                sortValue: (row) => row.item_type ?? row.category ?? '',
+              },
+              {
+                key: 'status',
+                label: 'Status',
+                render: (row) => <StatusChip status={row.status ?? ''} />,
+                exportValue: (row) => row.status,
+                sortValue: (row) => row.status,
+              },
+              {
+                key: 'condition',
+                label: 'Condition',
+                optional: true,
+                render: (row) => row.condition || '—',
+                exportValue: (row) => row.condition,
+                sortValue: (row) => row.condition,
+              },
+              {
+                key: 'washes',
+                label: 'Washes',
+                render: (row) => formatNumber(row.wash_count ?? 0),
+                exportValue: (row) => row.wash_count ?? 0,
+                sortValue: (row) => row.wash_count ?? 0,
+              },
+              {
+                key: 'scan',
+                label: 'Last scan',
+                render: (row) => (row.last_scanned_date ? formatDate(row.last_scanned_date) : '—'),
+                exportValue: (row) => row.last_scanned_date,
+                sortValue: (row) => row.last_scanned_date,
+              },
+            ]}
+          />
 
-          {selected ? <ScanHistory key={selected} code={selected} onClose={() => setSelected(null)} /> : null}
+          {data ? (
+            <p className="mt-3 text-xs text-slate-500">
+              Showing {rows.length} of {formatNumber(data.total)} tags
+              {data.total > 500 ? ' (first 500 loaded)' : ''}.
+            </p>
+          ) : null}
         </>
       )}
     </>

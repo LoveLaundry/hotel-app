@@ -1,13 +1,16 @@
-import { NavLink, Outlet } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import type { LucideIcon } from 'lucide-react'
 import {
   Building2,
   FileText,
   Info,
+  Keyboard,
   LayoutDashboard,
+  ListChecks,
   LogOut,
-  Package,
-  ReceiptText,
+  PanelLeftClose,
+  PanelLeftOpen,
   Shirt,
   Ticket,
   Truck,
@@ -16,57 +19,110 @@ import {
 } from 'lucide-react'
 import { appConfig } from '../config/app'
 import { useAuth } from '../auth/AuthContext'
+import { useFeatures } from '../features/feature-pack/context'
+import {
+  Drawer,
+  LastSignInInfo,
+  MenuButton,
+  ScopeBadge,
+  TruncatedText,
+} from '../features/feature-pack/components'
+import { useLocalStorageState, useScrolled } from '../features/feature-pack/hooks'
+import { friendlyRole, normalizeAssociation, STORAGE_KEYS } from '../features/feature-pack/utils'
 import clsx from 'clsx'
 
 const NAV_ICONS: Record<string, LucideIcon> = {
   '/': LayoutDashboard,
-  '/orders': Package,
   '/gate-passes': Ticket,
   '/linens': Shirt,
   '/deliveries': Truck,
   '/invoices': FileText,
-  '/bills': ReceiptText,
+  '/features': ListChecks,
 }
 
-/** HOTEL_ADMIN -> Hotel admin, SHOP_STAFF -> Shop staff. */
-function friendlyRole(role: string | undefined): string {
-  if (!role) return 'Account'
-  return role
-    .toLowerCase()
-    .replaceAll('_', ' ')
-    .replace(/\b\w/g, (letter) => letter.toUpperCase())
+function isCurrent(pathname: string, path: string): boolean {
+  return path === '/' ? pathname === '/' : pathname === path || pathname.startsWith(`${path}/`)
 }
 
 export function AppShell() {
-  const { user, signOut, laundries, currentLaundry, switchLaundry } = useAuth()
+  const { user, laundries, currentLaundry, switchLaundry } = useAuth()
+  const { requestConfirm, clearPortalState, setShortcutsOpen, notify } = useFeatures()
+  const location = useLocation()
+  const navigate = useNavigate()
+  const scrolled = useScrolled()
+  const [drawerOpen, setDrawerOpen] = useState(false)
+  const [collapsed, setCollapsed] = useLocalStorageState(STORAGE_KEYS.sidebarCollapsed, false)
+  const [switching, setSwitching] = useState<string | null>(null)
+
   const scope = user?.clientName ?? user?.laundry
-  // Only shown when this login really belongs to more than one laundry; with a
-  // single association a switch control would be dead UI.
   const canSwitch = laundries.length > 1
+  const choices = laundries.map(normalizeAssociation)
+  const navItems = [...appConfig.nav, { path: '/features', label: 'Feature guide', endpoint: 'local', blurb: '' }]
+
+  // A route change always dismisses the mobile drawer, even for back/forward.
+  useEffect(() => {
+    setDrawerOpen(false)
+  }, [location.pathname])
+
+  function safeSignOut() {
+    requestConfirm({
+      title: 'Sign out of the portal?',
+      body: 'This clears your session and portal data stored on this device. You can sign in again at any time.',
+      confirmLabel: 'Sign out',
+      tone: 'danger',
+      onConfirm: clearPortalState,
+    })
+  }
+
+  async function changeLaundry(id: string) {
+    if (id === currentLaundry || switching) return
+    setSwitching(id)
+    try {
+      await switchLaundry(id)
+      const choice = choices.find((item) => item.laundry_id === id)
+      notify(`Switched to ${choice?.laundry_name ?? 'the selected laundry'}.`)
+    } catch (error) {
+      notify(error instanceof Error ? error.message : 'Could not switch laundry.', 'error')
+    } finally {
+      setSwitching(null)
+    }
+  }
 
   return (
-    <div className="app-shell">
-      <aside className="app-sidebar">
+    <div className={clsx('app-shell', collapsed && 'is-sidebar-collapsed', scrolled && 'has-scrolled-topbar')}>
+      <aside className="app-sidebar" aria-label="Primary sidebar">
         <div className="sidebar-brand">
           <span className="sidebar-mark" aria-hidden="true">
             <WashingMachine />
           </span>
-          <p className="sidebar-title">{appConfig.title}</p>
+          {!collapsed ? <p className="sidebar-title">{appConfig.title}</p> : <span className="sr-only">{appConfig.title}</span>}
+          <button
+            type="button"
+            className="sidebar-collapse"
+            onClick={() => setCollapsed((current) => !current)}
+            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            aria-pressed={collapsed}
+          >
+            {collapsed ? <PanelLeftOpen aria-hidden="true" /> : <PanelLeftClose aria-hidden="true" />}
+          </button>
         </div>
 
-        <p className="sidebar-section">Workspace</p>
+        <p className="sidebar-section">{collapsed ? <span className="sr-only">Workspace</span> : 'Workspace'}</p>
         <nav className="sidebar-nav" aria-label="Main navigation">
-          {appConfig.nav.map((item) => {
+          {navItems.map((item) => {
             const Icon = NAV_ICONS[item.path] ?? LayoutDashboard
+            const current = isCurrent(location.pathname, item.path)
             return (
               <NavLink
                 key={item.path}
                 to={item.path}
                 end={item.path === '/'}
                 className={({ isActive }) => clsx('sidebar-link', isActive && 'is-active')}
+                aria-current={current ? 'page' : undefined}
+                title={collapsed ? item.label : undefined}
               >
                 <Icon aria-hidden="true" />
-                {item.label}
+                {collapsed ? <span className="sr-only">{item.label}</span> : <TruncatedText value={item.label} max={22} />}
               </NavLink>
             )
           })}
@@ -76,13 +132,15 @@ export function AppShell() {
           <NavLink
             to="/about"
             className={({ isActive }) => clsx('sidebar-link', isActive && 'is-active')}
+            aria-current={isCurrent(location.pathname, '/about') ? 'page' : undefined}
+            title={collapsed ? 'About this portal' : undefined}
           >
             <Info aria-hidden="true" />
-            About this portal
+            {collapsed ? <span className="sr-only">About this portal</span> : 'About this portal'}
           </NavLink>
-          <button type="button" onClick={signOut} className="sidebar-link">
+          <button type="button" onClick={safeSignOut} className="sidebar-link" title={collapsed ? 'Sign out' : undefined}>
             <LogOut aria-hidden="true" />
-            Sign out
+            {collapsed ? <span className="sr-only">Sign out</span> : 'Sign out'}
           </button>
         </div>
       </aside>
@@ -96,23 +154,43 @@ export function AppShell() {
             </div>
 
             <div className="topbar-actions">
+              <MenuButton onClick={() => setDrawerOpen(true)} open={drawerOpen} />
               {canSwitch ? (
                 <label className="select-wrap">
                   <Building2 aria-hidden="true" />
-                  <span className="sr-only">Laundry</span>
+                  <span className="sr-only">Switch laundry</span>
                   <select
                     value={currentLaundry ?? ''}
-                    onChange={(event) => void switchLaundry(event.target.value)}
+                    onChange={(event) => void changeLaundry(event.target.value)}
                     className="field-input select-input scope-select"
+                    disabled={switching !== null}
+                    aria-label="Switch laundry"
                   >
-                    {laundries.map((item) => (
-                      <option key={item.laundry_id} value={item.laundry_id}>
-                        {item.laundry_name || item.laundry_id}
+                    {choices.map((choice) => (
+                      <option
+                        key={`${choice.laundry_id}-${choice.client_name}`}
+                        value={choice.laundry_id}
+                        disabled={choice.status !== 'ACTIVE'}
+                      >
+                        {choice.status !== 'ACTIVE'
+                          ? `${choice.laundry_name} (${choice.status.toLowerCase()})`
+                          : choice.laundry_name}
                       </option>
                     ))}
                   </select>
                 </label>
               ) : null}
+
+              <button
+                type="button"
+                className="btn btn-ghost fp-icon-button fp-shortcut-button"
+                onClick={() => setShortcutsOpen(true)}
+                aria-label="Keyboard shortcuts"
+              >
+                <Keyboard aria-hidden="true" />
+              </button>
+
+              <ScopeBadge label={scope} />
 
               <div className="app-user">
                 <span className="app-avatar" aria-hidden="true">
@@ -121,41 +199,33 @@ export function AppShell() {
                 <div className="user-meta">
                   <p className="user-name">{user?.name}</p>
                   <p className="user-role">{friendlyRole(user?.role)}</p>
+                  <LastSignInInfo />
                 </div>
               </div>
             </div>
           </div>
 
-          <nav className="mobile-nav" aria-label="Main navigation">
-            {appConfig.nav.map((item) => {
+          <nav className="mobile-nav" aria-label="Quick navigation">
+            {navItems.map((item) => {
               const Icon = NAV_ICONS[item.path] ?? LayoutDashboard
+              const current = isCurrent(location.pathname, item.path)
               return (
                 <NavLink
                   key={item.path}
                   to={item.path}
                   end={item.path === '/'}
                   className={({ isActive }) => clsx('mobile-nav-link', isActive && 'is-active')}
+                  aria-current={current ? 'page' : undefined}
                 >
                   <Icon aria-hidden="true" />
                   {item.label}
                 </NavLink>
               )
             })}
-            <NavLink
-              to="/about"
-              className={({ isActive }) => clsx('mobile-nav-link', isActive && 'is-active')}
-            >
-              <Info aria-hidden="true" />
-              About
-            </NavLink>
-            <button type="button" onClick={signOut} className="mobile-nav-link">
-              <LogOut aria-hidden="true" />
-              Sign out
-            </button>
           </nav>
         </header>
 
-        <main className="app-main">
+        <main className="app-main" id="main-content" tabIndex={-1}>
           {/* Switching laundry replaces the token and scope. Remount the routed
               page so no query or form from the previous tenant survives. */}
           <Outlet key={currentLaundry ?? 'none'} />
@@ -164,6 +234,10 @@ export function AppShell() {
         <footer className="app-footer">
           <div className="app-footer-inner">
             <span>Account portal · Signed in as {user?.name ?? 'user'}</span>
+            <NavLink to="/features" className="text-link">
+              <ListChecks aria-hidden="true" />
+              Feature guide
+            </NavLink>
             <NavLink to="/about" className="text-link">
               <Info aria-hidden="true" />
               About this portal
@@ -171,6 +245,48 @@ export function AppShell() {
           </div>
         </footer>
       </div>
+
+      <Drawer open={drawerOpen} title="Navigation" side="left" onClose={() => setDrawerOpen(false)}>
+        <nav className="fp-drawer-nav" aria-label="Mobile navigation">
+          {navItems.map((item) => {
+            const Icon = NAV_ICONS[item.path] ?? LayoutDashboard
+            const current = isCurrent(location.pathname, item.path)
+            return (
+              <NavLink
+                key={item.path}
+                to={item.path}
+                end={item.path === '/'}
+                className={clsx('sidebar-link', current && 'is-active')}
+                aria-current={current ? 'page' : undefined}
+                onClick={() => setDrawerOpen(false)}
+              >
+                <Icon aria-hidden="true" />
+                {item.label}
+              </NavLink>
+            )
+          })}
+          <NavLink
+            to="/about"
+            className={clsx('sidebar-link', isCurrent(location.pathname, '/about') && 'is-active')}
+            aria-current={isCurrent(location.pathname, '/about') ? 'page' : undefined}
+            onClick={() => setDrawerOpen(false)}
+          >
+            <Info aria-hidden="true" />
+            About this portal
+          </NavLink>
+        </nav>
+        <div className="fp-drawer-actions">
+          <button type="button" className="btn btn-secondary" onClick={() => navigate('/features')}>
+            <ListChecks aria-hidden="true" /> Feature guide
+          </button>
+          <button type="button" className="btn btn-secondary" onClick={() => setShortcutsOpen(true)}>
+            <Keyboard aria-hidden="true" /> Shortcuts
+          </button>
+          <button type="button" className="btn btn-secondary" onClick={safeSignOut}>
+            <LogOut aria-hidden="true" /> Sign out
+          </button>
+        </div>
+      </Drawer>
     </div>
   )
 }

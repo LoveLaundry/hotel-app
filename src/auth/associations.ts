@@ -1,5 +1,6 @@
 import { authApi } from '../api/client'
 import type { Session, SessionUser } from '../session'
+import { assertHotelRole, isHotelRole, normalizeAssociations } from '../features/feature-pack/utils'
 
 /**
  * One laundry this login is registered with.
@@ -26,7 +27,9 @@ interface LaundriesResponse {
 
 export async function loadAssociations(): Promise<Association[]> {
   const { data } = await authApi.get<LaundriesResponse>('/client/auth/laundries')
-  return data?.items ?? []
+  // Some deployments return null items; normalise both the array and its rows
+  // so suspended/role-less candidates are still displayable with HOTEL defaults.
+  return normalizeAssociations(data?.items).filter((item) => isHotelRole(item.role_id))
 }
 
 /**
@@ -40,7 +43,7 @@ export async function switchLaundry(laundryId: string): Promise<Session> {
   const client = (data?.client ?? {}) as Record<string, unknown>
   const user: SessionUser = {
     name: String(client.user_name ?? ''),
-    role: String(client.role_id ?? '').toUpperCase(),
+    role: assertHotelRole(client.role_id ?? client.role),
     laundry: client.laundry_id ? String(client.laundry_id) : undefined,
     clientName: client.client_name ? String(client.client_name) : undefined,
   }

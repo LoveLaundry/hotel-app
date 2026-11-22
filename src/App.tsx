@@ -10,6 +10,9 @@ import { LinensPage } from './pages/LinensPage'
 import { DeliveriesPage } from './pages/DeliveriesPage'
 import { InvoicesPage } from './pages/InvoicesPage'
 import { AboutPage } from './pages/AboutPage'
+import { FeatureGuide } from './features/feature-pack/FeaturePanel'
+import { ErrorBoundary } from './features/feature-pack/components'
+import { FeatureProvider } from './features/feature-pack/FeatureProvider'
 
 function RequireAuth({ children }: { children: ReactNode }) {
   const { isAuthenticated } = useAuth()
@@ -39,6 +42,7 @@ function Router() {
         <Route path="/linens" element={<LinensPage />} />
         <Route path="/deliveries" element={<DeliveriesPage />} />
         <Route path="/invoices" element={<InvoicesPage />} />
+        <Route path="/features" element={<FeatureGuide />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
@@ -48,9 +52,13 @@ function Router() {
 export default function App() {
   return (
     <BrowserRouter>
-      <AuthProvider>
-        <Router />
-      </AuthProvider>
+      <FeatureProvider>
+        <AuthProvider>
+          <ErrorBoundary>
+            <Router />
+          </ErrorBoundary>
+        </AuthProvider>
+      </FeatureProvider>
     </BrowserRouter>
   )
 }
