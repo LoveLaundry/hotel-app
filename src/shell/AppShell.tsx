@@ -19,6 +19,7 @@ import {
 } from 'lucide-react'
 import { appConfig } from '../config/app'
 import { useAuth } from '../auth/AuthContext'
+import { ThemeSwitcher } from '../ll-theme'
 import { useFeatures } from '../features/feature-pack/context'
 import {
   Drawer,
@@ -180,6 +181,8 @@ export function AppShell() {
                   </select>
                 </label>
               ) : null}
+
+              <ThemeSwitcher compact className="fp-topbar-theme" />
 
               <button
                 type="button"

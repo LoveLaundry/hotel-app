@@ -104,3 +104,18 @@
 100. **Feature manifest panel** — The /features route and palette command list all 100 shipped features. _(src/features/feature-pack/FeaturePanel.tsx)_
 
 Validation: `npm run build` and `npm test` (10 pure-logic test cases).
+
+## Current platform state — unified theme sync (2026-11-23)
+
+- The 100-item catalogue above is unchanged; `/features` still lists the same 100 code paths.
+- `src/ll-theme.tsx` and `src/ll-design-tokens.css` are now synced from the authoritative
+  `system-manegment/quotations-ui` checkout, so the hotel portal uses the same 20
+  contrast-checked light/dark themes, no-blue five-colour palette, semantic aliases,
+  sidebar contrast fix and print styles as the manager UI.
+- The saved theme (`lovelaundry-theme`, with legacy `theme-preset` migration) is applied to
+  `<html data-theme>` by the inline `index.html` script before first paint, avoiding a flash.
+- A compact `ThemeSwitcher` in the top bar lets operators change theme without leaving the
+  portal. The feature-pack high-contrast / large-text / reduced-motion toggles still work
+  under every theme via an `html:root[data-contrast='high']` compatibility block.
+- Verified locally: `npm run build` (`tsc --noEmit` + Vite) and `npm test` (**10/10 passed**).
+  Node 20.16 is below Vite 8's recommended 20.19+, so the build prints an engine warning only.
