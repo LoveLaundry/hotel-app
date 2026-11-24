@@ -1,13 +1,11 @@
 import { useEffect, useState } from 'react'
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import type { LucideIcon } from 'lucide-react'
 import {
   Building2,
   FileText,
   Info,
-  Keyboard,
   LayoutDashboard,
-  ListChecks,
   LogOut,
   PanelLeftClose,
   PanelLeftOpen,
@@ -38,7 +36,6 @@ const NAV_ICONS: Record<string, LucideIcon> = {
   '/linens': Shirt,
   '/deliveries': Truck,
   '/invoices': FileText,
-  '/features': ListChecks,
 }
 
 function isCurrent(pathname: string, path: string): boolean {
@@ -47,9 +44,8 @@ function isCurrent(pathname: string, path: string): boolean {
 
 export function AppShell() {
   const { user, laundries, currentLaundry, switchLaundry } = useAuth()
-  const { requestConfirm, clearPortalState, setShortcutsOpen, notify } = useFeatures()
+  const { requestConfirm, clearPortalState, notify } = useFeatures()
   const location = useLocation()
-  const navigate = useNavigate()
   const scrolled = useScrolled()
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [collapsed, setCollapsed] = useLocalStorageState(STORAGE_KEYS.sidebarCollapsed, false)
@@ -58,7 +54,7 @@ export function AppShell() {
   const scope = user?.clientName ?? user?.laundry
   const canSwitch = laundries.length > 1
   const choices = laundries.map(normalizeAssociation)
-  const navItems = [...appConfig.nav, { path: '/features', label: 'Feature guide', endpoint: 'local', blurb: '' }]
+  const navItems = appConfig.nav
 
   // A route change always dismisses the mobile drawer, even for back/forward.
   useEffect(() => {
@@ -184,15 +180,6 @@ export function AppShell() {
 
               <ThemeSwitcher compact className="fp-topbar-theme" />
 
-              <button
-                type="button"
-                className="btn btn-ghost fp-icon-button fp-shortcut-button"
-                onClick={() => setShortcutsOpen(true)}
-                aria-label="Keyboard shortcuts"
-              >
-                <Keyboard aria-hidden="true" />
-              </button>
-
               <ScopeBadge label={scope} />
 
               <div className="app-user">
@@ -237,10 +224,6 @@ export function AppShell() {
         <footer className="app-footer">
           <div className="app-footer-inner">
             <span>Account portal · Signed in as {user?.name ?? 'user'}</span>
-            <NavLink to="/features" className="text-link">
-              <ListChecks aria-hidden="true" />
-              Feature guide
-            </NavLink>
             <NavLink to="/about" className="text-link">
               <Info aria-hidden="true" />
               About this portal
@@ -279,12 +262,6 @@ export function AppShell() {
           </NavLink>
         </nav>
         <div className="fp-drawer-actions">
-          <button type="button" className="btn btn-secondary" onClick={() => navigate('/features')}>
-            <ListChecks aria-hidden="true" /> Feature guide
-          </button>
-          <button type="button" className="btn btn-secondary" onClick={() => setShortcutsOpen(true)}>
-            <Keyboard aria-hidden="true" /> Shortcuts
-          </button>
           <button type="button" className="btn btn-secondary" onClick={safeSignOut}>
             <LogOut aria-hidden="true" /> Sign out
           </button>

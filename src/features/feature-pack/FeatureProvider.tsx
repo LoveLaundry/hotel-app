@@ -15,19 +15,14 @@ import {
 } from './context'
 import {
   BackToTop,
-  CommandPalette,
   ConfirmDialog,
-  NotificationBell,
   OfflineBanner,
-  portalCommands,
   RouteProgress,
   SessionExpiryBanner,
-  ShortcutHelpDialog,
   SkipLink,
   ToastStack,
   localNavigationLabel,
 } from './components'
-import { FeatureGuide } from './FeaturePanel'
 import { useActionQueue, useLocalStorageState, useOnlineStatus, usePrefersReducedMotion, useSessionWarning } from './hooks'
 import { clearFeatureCache, normalizeError, readJson, STORAGE_KEYS, writeJsonStrict } from './utils'
 
@@ -46,11 +41,6 @@ function expiryFromToken(token: string | undefined): number | null {
 function newId(prefix: string): string {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return `${prefix}-${crypto.randomUUID()}`
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`
-}
-
-function isTypingTarget(target: EventTarget | null): boolean {
-  const element = target as HTMLElement | null
-  return Boolean(element && (/^(INPUT|TEXTAREA|SELECT)$/.test(element.tagName) || element.isContentEditable))
 }
 
 /** Global UI state for the hotel portal. No branding, tokens or cross-app state. */
@@ -170,27 +160,12 @@ export function FeatureProvider({ children }: { children: ReactNode }) {
     const label = localNavigationLabel(location.pathname)
     document.title = `${label} · ${appConfig.title}`
     announce(`${label} page loaded`)
-    setPaletteOpen(false)
-    setFeaturesOpen(false)
-    setNotificationsOpen(false)
     setProgressActive(true)
     const timer = window.setTimeout(() => setProgressActive(false), reducedMotion ? 0 : 520)
     return () => window.clearTimeout(timer)
   }, [location.pathname, announce, reducedMotion])
 
   useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
-        event.preventDefault()
-        setPaletteOpen((open) => !open)
-        return
-      }
-      if (event.key === '?' && !isTypingTarget(event.target)) {
-        event.preventDefault()
-        setShortcutsOpen(true)
-      }
-    }
-    const onShortcuts = () => setShortcutsOpen(true)
     const onNotification = (event: Event) => {
       const detail = (event as CustomEvent<{ title: string; body: string }>).detail
       if (detail?.title) pushNotification(detail)
@@ -205,14 +180,10 @@ export function FeatureProvider({ children }: { children: ReactNode }) {
       setExpiresAt(expiryFromToken(detail?.token ?? readSession()?.token))
       refreshLastSignIn()
     }
-    window.addEventListener('keydown', onKeyDown)
-    window.addEventListener('ll_hotel:shortcuts', onShortcuts)
     window.addEventListener('ll_hotel:notification', onNotification)
     window.addEventListener('ll_hotel:unauthorized', onUnauthorized)
     window.addEventListener('ll_hotel:session', onSession)
     return () => {
-      window.removeEventListener('keydown', onKeyDown)
-      window.removeEventListener('ll_hotel:shortcuts', onShortcuts)
       window.removeEventListener('ll_hotel:notification', onNotification)
       window.removeEventListener('ll_hotel:unauthorized', onUnauthorized)
       window.removeEventListener('ll_hotel:session', onSession)
@@ -257,15 +228,6 @@ export function FeatureProvider({ children }: { children: ReactNode }) {
       .then(() => notify('Session is still active.'))
       .catch((error: unknown) => notify(normalizeError(error), 'error'))
   }, [notify])
-
-  const commands = useMemo(
-    () =>
-      portalCommands(
-        () => window.dispatchEvent(new Event('ll_hotel:refresh')),
-        clearPortalState,
-      ),
-    [clearPortalState],
-  )
 
   const value = useMemo<FeatureContextValue>(
     () => ({
@@ -351,10 +313,6 @@ export function FeatureProvider({ children }: { children: ReactNode }) {
       <SessionExpiryBanner onRefresh={checkSession} onSignOut={clearPortalState} />
       {children}
       <BackToTop />
-      <NotificationBell />
-      <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} commands={commands} />
-      <ShortcutHelpDialog />
-      {featuresOpen ? <FeatureGuide variant="dialog" onClose={() => setFeaturesOpen(false)} /> : null}
       <ConfirmDialog />
       <ToastStack />
       <div className="sr-only" role="status" aria-live="polite">
