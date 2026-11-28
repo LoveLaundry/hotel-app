@@ -1,4 +1,5 @@
 import { formatDate, useQuery } from '../api/hooks'
+import { LiveTag } from '../components/LiveTag'
 import { formatNumber } from '../features/feature-pack/utils'
 import {
   DataFreshness,
@@ -116,13 +117,18 @@ export function LinensPage() {
             getDate={(row) => row.last_scanned_date ?? row.updated_at}
             searchText={(row) => [row.linen_id, row.item_type, row.description, row.category, row.condition]}
             detailTitle={(row) => `Tag ${row.linen_id}`}
-            renderDetail={(row) => <ScanHistory code={row.linen_id} />}
+            renderDetail={(row) => (
+              <div className="flex flex-col gap-3">
+                <LiveTag linenId={row.linen_id} />
+                <ScanHistory code={row.linen_id} />
+              </div>
+            )}
             columns={[
               {
                 key: 'tag',
                 label: 'Tag',
                 cardLabel: true,
-                render: (row) => <span className="font-mono font-medium">{row.linen_id}</span>,
+                render: (row) => <LiveTag linenId={row.linen_id} compact />,
                 exportValue: (row) => row.linen_id,
                 sortValue: (row) => row.linen_id,
               },
